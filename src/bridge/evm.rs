@@ -66,7 +66,7 @@ impl<
             .allowance(source_provider.default_signer_address(), token_messenger)
             .call()
             .await?;
-        let approval_hash: Option<TxHash> = if current_allowance < U256::from(10) {
+        let approval_hash: Option<TxHash> = if current_allowance < amount {
             debug!("Approving allowance");
             let approve_hash = erc20
                 .approve(token_messenger, U256::from(10))
@@ -105,11 +105,20 @@ impl<
     }
 
     #[instrument(skip(self), level = Level::INFO)]
-    pub async fn recv(&self, burn_hash: TxHash) -> Result<(Attestation, TxHash)> {
+    pub async fn recv(
+        &self,
+        burn_hash: TxHash,
+        max_attempts: Option<u32>,
+        poll_interval: Option<u64>,
+    ) -> Result<(Attestation, TxHash)> {
         let destination_provider = self.destination_provider();
         let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let attestation = self
-            .get_attestation_with_retry(format!("0x{}", encode(burn_hash)), None, Some(10))
+            .get_attestation_with_retry(
+                format!("0x{}", encode(burn_hash)),
+                max_attempts,
+                poll_interval,
+            )
             .await?;
 
         let message_transmitter =
@@ -120,14 +129,16 @@ impl<
             attestation.attestation.clone().into(),
         );
 
-        info!("receiving on chain {}", self.destination_chain(),);
+        info!("receiving on chain {}", self.destination_chain());
         Ok((
             attestation,
             recv_message_tx
                 .send()
                 .await?
                 .with_required_confirmations(2)
-                .with_timeout(Some(Duration::from_secs(90)))
+                .with_timeout(Some(Duration::from_secs(
+                    self.source_chain().confirmation_average_time_seconds()?,
+                )))
                 .watch()
                 .await?,
         ))
@@ -140,18 +151,30 @@ impl<
         destination_caller: Option<EvmAddress>,
         max_fee: Option<U256>,
         min_finality_threshold: Option<u32>,
-        //        attestation_poll_interval: Option<u64>,
+        max_attempts: Option<u32>,
+        attestation_poll_interval: Option<u64>,
     ) -> Result<super::EvmBridgeResult> {
+        // verify addresses resolve to real evm before burning. See recv method for more
+        // details.
+        let _: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let (burn_hash, approval_hash) = self
             .burn(amount, destination_caller, max_fee, min_finality_threshold)
             .await?;
-        let (attestation, recv_hash) = self.recv(burn_hash).await?;
 
-        Ok(EvmBridgeResult {
-            approval: approval_hash,
-            burn: burn_hash,
-            recv: recv_hash,
-            attestation,
-        })
+        match self
+            .recv(burn_hash, max_attempts, attestation_poll_interval)
+            .await
+        {
+            Ok((attestation, recv_hash)) => Ok(EvmBridgeResult {
+                approval: approval_hash,
+                burn: burn_hash,
+                recv: recv_hash,
+                attestation,
+            }),
+            Err(e) => Err(crate::Error::ReceiveFailedAfterBurn {
+                burn_hash: format!("{}", burn_hash),
+                reason: e.to_string(),
+            }),
+        }
     }
 }

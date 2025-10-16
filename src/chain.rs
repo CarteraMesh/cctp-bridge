@@ -70,8 +70,8 @@ impl CctpChain for Chain {
         match self.kind() {
             ChainKind::Named(n) => n.confirmation_average_time_seconds(),
             ChainKind::Id(id) => match *id {
-                SOLANA_DEVNET_ID => Ok(2),
-                SOLANA_MAINNET_ID => Ok(2),
+                SOLANA_DEVNET_ID => Ok(4),
+                SOLANA_MAINNET_ID => Ok(4),
                 _ => Err(Error::ChainNotSupported {
                     chain: self.to_string(),
                 }),
@@ -261,7 +261,7 @@ impl CctpChain for NamedChain {
             Arbitrum => ARBITRUM_USDC_CONTRACT,
             Avalanche => AVALANCHE_USDC_CONTRACT,
             Base => BASE_USDC_CONTRACT,
-            Optimism => OPTIMISM_MESSAGE_TRANSMITTER_ADDRESS,
+            Optimism => OPTIMISM_USDC_CONTRACT,
             Polygon => POLYGON_USDC_CONTRACT,
             // Testnets
             ArbitrumSepolia => ARBITRUM_SEPOLIA_USDC_CONTRACT,

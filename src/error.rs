@@ -70,6 +70,9 @@ pub enum Error {
 
     #[error("failed to get solana fee recipient account: {0}")]
     SolanaFeeRecipientError(String),
+
+    #[error("Receive failed after successful burn (tx: {burn_hash}): {reason}")]
+    ReceiveFailedAfterBurn { burn_hash: String, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
