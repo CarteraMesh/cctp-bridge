@@ -152,7 +152,6 @@ jobs:
       - name: cargo hack
         run: cargo hack --feature-powerset check
 
-
   cargo_sort:
     runs-on: ${{ vars.RUNNER }}
     steps:
@@ -193,4 +192,30 @@ jobs:
         run: cargo install cargo-machete
       - name: Check unused Cargo dependencies
         run: cargo machete
-        
+
+  examples:
+    runs-on: ${{ vars.RUNNER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - uses: ubicloud/rust-cache@v2
+        with:
+          cache-on-failure: "true"
+          cache-all-crates: "true"
+          cache-workspace-crates: "true"
+      - name: Stable Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run examples
+        env:
+          RUST_BACKTRACE: 1
+          RUST_LOG: info
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          EVM_SECRET_KEY: ${{ secrets.EVM_SECRET_KEY }}
+          TEST_PRIVATE_KEY: ${{ secrets.TEST_PRIVATE_KEY }}
+          SOLANA_RPC_URL: ${{ secrets.RPC_URL }}
+        run: |
+          cargo run --example evm_sol
+          cargo run --example sol_evm
+          cargo run --example reclaim

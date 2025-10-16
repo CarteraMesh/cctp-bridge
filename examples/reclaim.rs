@@ -1,8 +1,6 @@
 mod common;
 
 use {
-    alloy_chains::NamedChain,
-    alloy_primitives::U256,
     alloy_provider::WalletProvider,
     cctp_bridge::{Cctp, SolanaWrapper},
     solana_signer::Signer,
@@ -23,16 +21,11 @@ async fn main() -> anyhow::Result<()> {
 
     let rpc: SolanaWrapper = rpc.into();
 
-    let bridge = Cctp::new_evm_sol(
-        base_provider,
-        rpc,
-        NamedChain::BaseSepolia,
-        owner.pubkey(),
-        cctp_bridge::SOLANA_DEVNET,
-    );
-    let result = bridge
-        .bridge_evm_sol(&owner, U256::from(10), None, None, None)
-        .await?;
-    println!("success {result}");
+    let bridge = Cctp::new_reclaim(rpc.clone(), rpc, cctp_bridge::SOLANA_DEVNET);
+    let result = bridge.reclaim(&owner).await?;
+    println!("reclaimed {} accounts", result.len());
+    for (sig, addr) in result {
+        println!("reclaimed account {} with signature {}", addr, sig);
+    }
     Ok(())
 }
