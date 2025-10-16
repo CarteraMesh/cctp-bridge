@@ -55,13 +55,6 @@ cargo +nightly fmt --all
 cargo +nightly fmt --all -- --check
 ```
 
-## License
-
- * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
-
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
