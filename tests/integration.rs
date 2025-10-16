@@ -44,11 +44,13 @@ pub fn evm_setup(base_sepolia: bool) -> anyhow::Result<impl WalletProvider + Pro
     } else {
         "https://eth-sepolia.g.alchemy.com/v2"
     };
-    let base_provider = ProviderBuilder::new()
+    let provider = ProviderBuilder::new()
         .wallet(wallet)
         .connect_http(format!("{url}/{api_key}").parse()?);
-    Ok(base_provider)
+    info!("evm address {}", provider.default_signer_address());
+    Ok(provider)
 }
+
 pub fn solana_setup() -> anyhow::Result<(Keypair, RpcClient)> {
     let kp_file = env::var("KEYPAIR_FILE").ok();
     let owner = if let Some(kp) = kp_file {
@@ -82,13 +84,11 @@ async fn test_reclaim() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_evm() -> Result<()> {
+async fn test_evm_bridge() -> Result<()> {
     setup();
     let sepolia_provider = evm_setup(false)?;
     let base_provider = evm_setup(true)?;
     let recipient = base_provider.default_signer_address();
-    info!("evm address {recipient}");
-
     let bridge = Cctp::new(
         sepolia_provider,
         base_provider,
@@ -98,6 +98,31 @@ async fn test_evm() -> Result<()> {
     );
     let result = bridge.bridge(U256::from(10), None, None, None).await?;
     info!("bridge result {}", result);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_evm_burn_recv_split() -> Result<()> {
+    setup();
+    let sepolia_provider = evm_setup(false)?;
+    let base_provider = evm_setup(true)?;
+    let recipient = base_provider.default_signer_address();
+
+    let bridge = Cctp::new(
+        sepolia_provider,
+        base_provider,
+        NamedChain::Sepolia,
+        NamedChain::BaseSepolia,
+        recipient,
+    );
+    let (burn_hash, approval_hash) = bridge.burn(U256::from(10), None, None, None).await?;
+    info!(
+        "burn {burn_hash} approval {}",
+        approval_hash.unwrap_or_default()
+    );
+
+    let (attest, recv_hash) = bridge.recv(burn_hash).await?;
+    info!("attest {attest} recv {recv_hash}");
     Ok(())
 }
 
