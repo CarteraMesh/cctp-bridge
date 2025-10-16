@@ -17,41 +17,6 @@ concurrency:
   cancel-in-progress: true
 name: test
 jobs:
-  required:
-    runs-on: ${{ vars.RUNNER }}
-    name: ubuntu / ${{ matrix.toolchain }}
-    strategy:
-      matrix:
-        # run on stable and beta to ensure that tests won't break on the next version of the rust
-        # toolchain
-        toolchain: [stable]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: true
-      - uses: ubicloud/rust-cache@v2
-        with:
-          cache-on-failure: "true"
-          cache-all-crates: "true"
-          workspaces: |
-            . -> target
-          # Specifies what to use as the backend providing cache
-          # Can be set to "github", "buildjet", or "warpbuild"
-          # default: "github"
-      - name: Install ${{ matrix.toolchain }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
-      - name: cargo generate-lockfile
-        # enable this ci template to run regardless of whether the lockfile is checked in or not
-        if: hashFiles('Cargo.lock') == ''
-        run: cargo generate-lockfile
-      # https://twitter.com/jonhoo/status/1571290371124260865
-      - name: cargo test --locked
-        run: cargo test --locked --all-features --all-targets
-      # https://github.com/rust-lang/cargo/issues/6669
-      - name: cargo test --doc
-        run: cargo test --locked --all-features --doc
   os-check:
     # run cargo test on mac and windows
     runs-on: ${{ matrix.os }}
@@ -80,6 +45,13 @@ jobs:
   coverage:
     runs-on: ${{ vars.RUNNER }}
     name: ubuntu / stable / coverage / ${{ matrix.features }}
+    env:
+      RUST_BACKTRACE: 1
+      RUST_LOG: info,cctp_bridge=debug
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+      EVM_SECRET_KEY: ${{ secrets.EVM_SECRET_KEY }}
+      TEST_PRIVATE_KEY: ${{ secrets.TEST_PRIVATE_KEY }}
+      SOLANA_RPC_URL: ${{ secrets.RPC_URL }}
     strategy:
       fail-fast: false
       matrix:
@@ -105,9 +77,9 @@ jobs:
       - name: cargo llvm-cov (${{ matrix.features }})
         run: |
           if [ "${{ matrix.features }}" == "default" ]; then
-            cargo llvm-cov --locked --lcov --output-path lcov-${{ matrix.features }}.info
+            cargo llvm-cov --locked --lcov --output-path lcov-${{ matrix.features }}.info -- --test-threads=1
           else
-            cargo llvm-cov --locked --features "${{ matrix.features }}" --lcov --output-path lcov-${{ matrix.features }}.info
+            cargo llvm-cov --locked --features "${{ matrix.features }}" --lcov --output-path lcov-${{ matrix.features }}.info -- --test-threads=1
           fi
       - name: Record Rust version
         run: echo "RUST=$(rustc --version)" >> "$GITHUB_ENV"

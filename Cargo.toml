@@ -47,16 +47,11 @@ tracing = "0.1"
 [dev-dependencies]
 alloy-signer-local = "1"
 anyhow = "1"
-dotenv = "0.15"
+dotenvy = "0.15"
 rstest = "0.26"
 solana-commitment-config = "2"
 tokio = { version = "1", features = ["test-util", "macros", "rt-multi-thread"] }
-tracing-subscriber = "0.3"
-
-#[lints.rust]
-#unused_imports = "allow"
-#unused_variables = "allow"
-#dead_code = "allow"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [lints.clippy]
 match_like_matches_macro = "allow"
