@@ -1,6 +1,7 @@
 use {
     super::Cctp,
     crate::{
+        Attestation,
         CctpChain,
         ERC20,
         EvmBridgeResult,
@@ -40,20 +41,17 @@ impl<
     }
 
     #[instrument(skip(self,max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
-    pub async fn bridge(
+    pub async fn burn(
         &self,
         amount: alloy_primitives::U256,
         destination_caller: Option<EvmAddress>,
         max_fee: Option<U256>,
         min_finality_threshold: Option<u32>,
-        //        attestation_poll_interval: Option<u64>,
-    ) -> Result<super::EvmBridgeResult> {
+    ) -> Result<(TxHash, Option<TxHash>)> {
         info!("burning {amount}");
         let source_provider = self.source_provider();
-        let destination_provider = self.destination_provider();
         let recipient: EvmAddress = self.recipient().try_into()?;
         let token_messenger: EvmAddress = self.token_messenger_contract()?.try_into()?;
-        let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let destination_domain = self.destination_domain_id()?;
         let usdc_address = self.source_chain().usdc_token_address()?.try_into()?;
         let erc20 = ERC20::new(usdc_address, source_provider);
@@ -102,6 +100,14 @@ impl<
             )))
             .watch()
             .await?;
+
+        Ok((burn_hash, approval_hash))
+    }
+
+    #[instrument(skip(self), level = Level::INFO)]
+    pub async fn recv(&self, burn_hash: TxHash) -> Result<(Attestation, TxHash)> {
+        let destination_provider = self.destination_provider();
+        let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let attestation = self
             .get_attestation_with_retry(format!("0x{}", encode(burn_hash)), None, Some(10))
             .await?;
@@ -114,14 +120,32 @@ impl<
             attestation.attestation.clone().into(),
         );
 
-        info!("receiving {amount} on chain {}", self.destination_chain(),);
-        let recv_hash = recv_message_tx
-            .send()
-            .await?
-            .with_required_confirmations(2)
-            .with_timeout(Some(Duration::from_secs(90)))
-            .watch()
+        info!("receiving on chain {}", self.destination_chain(),);
+        Ok((
+            attestation,
+            recv_message_tx
+                .send()
+                .await?
+                .with_required_confirmations(2)
+                .with_timeout(Some(Duration::from_secs(90)))
+                .watch()
+                .await?,
+        ))
+    }
+
+    #[instrument(skip(self,max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
+    pub async fn bridge(
+        &self,
+        amount: alloy_primitives::U256,
+        destination_caller: Option<EvmAddress>,
+        max_fee: Option<U256>,
+        min_finality_threshold: Option<u32>,
+        //        attestation_poll_interval: Option<u64>,
+    ) -> Result<super::EvmBridgeResult> {
+        let (burn_hash, approval_hash) = self
+            .burn(amount, destination_caller, max_fee, min_finality_threshold)
             .await?;
+        let (attestation, recv_hash) = self.recv(burn_hash).await?;
 
         Ok(EvmBridgeResult {
             approval: approval_hash,
