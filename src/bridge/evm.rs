@@ -53,11 +53,11 @@ impl<
         let token_messenger: EvmAddress = self.token_messenger_contract()?.try_into()?;
         let destination_domain = self.destination_domain_id()?;
         let usdc_address = self.source_chain().usdc_token_address()?.try_into()?;
-        let confirm_timeout = Some(Duration::from_secs(
-            self.source_chain().confirmation_average_time_seconds()?,
-        ));
         // TODO make configurable or add to chain a helper method
         let confirmations = 2;
+        let confirm_timeout = Some(Duration::from_secs(
+            self.source_chain().confirmation_average_time_seconds()? * confirmations,
+        ));
         let erc20 = ERC20::new(usdc_address, source_provider);
 
         let usdc_balance = erc20
@@ -111,25 +111,16 @@ impl<
         Ok((burn_hash, approval_hash))
     }
 
-    #[instrument(level = Level::INFO)]
-    pub async fn recv(
-        &self,
-        burn_hash: TxHash,
-        max_attempts: Option<u32>,
-        poll_interval: Option<u64>,
-    ) -> Result<(Attestation, TxHash)> {
+    pub async fn recv_with_attestation(&self, attestation: &Attestation) -> Result<TxHash> {
         let destination_provider = self.destination_provider();
         let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         // TODO make configurable or add to chain a helper method
         let confirmations = 2;
         let confirm_timeout = Some(Duration::from_secs(
             self.destination_chain()
-                .confirmation_average_time_seconds()?,
+                .confirmation_average_time_seconds()?
+                * confirmations,
         ));
-        let attestation = self
-            .get_attestation_evm(burn_hash, max_attempts, poll_interval)
-            .await?;
-
         let message_transmitter =
             MessageTransmitter::new(message_transmitter, destination_provider);
 
@@ -139,15 +130,27 @@ impl<
         );
 
         info!("receiving on chain {}", self.destination_chain());
-        Ok((
-            attestation,
-            recv_message_tx
-                .send()
-                .await?
-                .with_required_confirmations(confirmations)
-                .with_timeout(confirm_timeout)
-                .watch()
-                .await?,
-        ))
+        Ok(recv_message_tx
+            .send()
+            .await?
+            .with_required_confirmations(confirmations)
+            .with_timeout(confirm_timeout)
+            .watch()
+            .await?)
+    }
+
+    #[instrument(level = Level::INFO)]
+    pub async fn recv(
+        &self,
+        burn_hash: TxHash,
+        max_attempts: Option<u32>,
+        poll_interval: Option<u64>,
+    ) -> Result<(Attestation, TxHash)> {
+        let attestation = self
+            .get_attestation_evm(burn_hash, max_attempts, poll_interval)
+            .await?;
+
+        let hash = self.recv_with_attestation(&attestation).await?;
+        Ok((attestation, hash))
     }
 }

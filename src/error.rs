@@ -63,9 +63,6 @@ pub enum Error {
     SolanaInvalidFee(u64, u64),
 
     #[error(transparent)]
-    BincodeError(#[from] bincode::Error),
-
-    #[error(transparent)]
     SolanaSendError(#[from] nitrogen_instruction_builder::Error),
 
     #[error("failed to get solana claimable accounts: {0}")]
@@ -74,7 +71,7 @@ pub enum Error {
     #[error("failed to get solana fee recipient account: {0}")]
     SolanaFeeRecipientError(String),
 
-    #[error("Insufficient balance balance={0} amount={1}")]
+    #[error("Insufficient balance have {0} need {1}")]
     InsufficientBalance(U256, U256),
 }
 

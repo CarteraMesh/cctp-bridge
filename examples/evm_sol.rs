@@ -13,7 +13,7 @@ use {
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
-    let base_provider = common::evm_setup()?;
+    let base_provider = common::evm_base_setup()?;
     let (owner, rpc) = common::solana_setup()?;
     info!(
         "solana address {} sends to base address {}",

@@ -28,7 +28,6 @@ alloy-provider = { version = "1", default-features = false, features = [
 alloy-rpc-types = "1"
 alloy-sol-types = { version = "1", features = ["json"] }
 alloy-transport = { version = "1", default-features = false }
-bincode = "1"
 nitrogen-circle-message-transmitter-v2-encoder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
 nitrogen-circle-token-messenger-minter-v2-encoder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
 nitrogen-instruction-builder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
