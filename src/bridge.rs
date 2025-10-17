@@ -8,18 +8,22 @@ use {
         CctpChain,
         error::{Error, Result},
     },
-    alloy_chains::{Chain, NamedChain},
+    alloy_chains::{Chain, ChainKind, NamedChain},
     alloy_network::Ethereum,
-    alloy_primitives::{FixedBytes, TxHash, hex},
+    alloy_primitives::{
+        FixedBytes,
+        TxHash,
+        hex::{self, encode},
+    },
     alloy_provider::Provider,
     alloy_sol_types::SolEvent,
     reqwest::{Client, Response},
     solana_signature::Signature as SolanaSignature,
     std::{
         fmt::{Debug, Display},
-        thread::sleep,
         time::Duration,
     },
+    tokio::time::sleep,
     tracing::{Level, debug, error, info, instrument, trace},
 };
 
@@ -51,12 +55,15 @@ pub const CHAIN_CONFIRMATION_CONFIG: &[(NamedChain, u64, Duration)] = &[
 ];
 
 /// Gets the chain-specific confirmation configuration
-pub fn get_chain_confirmation_config(chain: &NamedChain) -> (u64, Duration) {
-    CHAIN_CONFIRMATION_CONFIG
-        .iter()
-        .find(|(ch, _, _)| ch == chain)
-        .map(|(_, confirmations, timeout)| (*confirmations, *timeout))
-        .unwrap_or((1, DEFAULT_CONFIRMATION_TIMEOUT))
+pub fn get_chain_confirmation_config(chain: &Chain) -> (u64, Duration) {
+    match chain.kind() {
+        ChainKind::Named(n) => CHAIN_CONFIRMATION_CONFIG
+            .iter()
+            .find(|(ch, _, _)| ch == n)
+            .map(|(_, confirmations, timeout)| (*confirmations, *timeout))
+            .unwrap_or((1, DEFAULT_CONFIRMATION_TIMEOUT)),
+        ChainKind::Id(_) => (2, Duration::from_secs(4)), // TODO add specific timeout for id chain
+    }
 }
 
 /// For solana reclaim accounts
@@ -114,7 +121,7 @@ impl Display for EvmBridgeResult {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Cctp<SrcProvider, DstProvider> {
     source_provider: SrcProvider,
     destination_provider: DstProvider,
@@ -122,6 +129,18 @@ pub struct Cctp<SrcProvider, DstProvider> {
     destination_chain: Chain,
     recipient: Address,
     client: Client,
+}
+
+impl<SrcProvider, DstProvider> Debug for Cctp<SrcProvider, DstProvider> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let src_domain = self.source_chain.cctp_domain_id().unwrap_or(u32::MAX);
+        let dst_domain = self.destination_chain.cctp_domain_id().unwrap_or(u32::MAX);
+        write!(
+            f,
+            "CCTP[{}({})->{}({})]",
+            self.source_chain, src_domain, self.destination_chain, dst_domain
+        )
+    }
 }
 
 impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
@@ -196,6 +215,21 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
         )
     }
 
+    /// Wrapper call to [`get_attestation_with_retry`] for evm [`TxHash`]
+    pub async fn get_attestation_evm(
+        &self,
+        message_hash: TxHash,
+        max_attempts: Option<u32>,
+        poll_interval: Option<u64>,
+    ) -> Result<Attestation> {
+        self.get_attestation_with_retry(
+            format!("0x{}", encode(message_hash)),
+            max_attempts,
+            poll_interval,
+        )
+        .await
+    }
+
     /// Gets the attestation for a message hash from the CCTP API
     ///
     /// # Arguments
@@ -238,7 +272,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
             if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 let secs = 5 * 60;
                 debug!(sleep_secs = ?secs, "Rate limit exceeded, waiting before retrying");
-                sleep(Duration::from_secs(secs));
+                sleep(Duration::from_secs(secs)).await;
                 continue;
             }
 
@@ -251,7 +285,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
                     poll_interval = ?poll_interval,
                     "Attestation not found (404), waiting before retrying"
                 );
-                sleep(Duration::from_secs(poll_interval));
+                sleep(Duration::from_secs(poll_interval)).await;
                 continue;
             }
 
@@ -322,7 +356,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
                         poll_interval = ?poll_interval,
                         "Attestation pending, waiting before retrying"
                     );
-                    sleep(Duration::from_secs(poll_interval));
+                    sleep(Duration::from_secs(poll_interval)).await;
                 }
             }
         }

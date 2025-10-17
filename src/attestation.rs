@@ -5,7 +5,7 @@ use {
 };
 
 /// To be passed to message transmitter to claim/mint
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Attestation {
     pub attestation: Vec<u8>,
     pub message: Vec<u8>,

@@ -262,7 +262,7 @@ impl<SrcProvider: Provider<Ethereum> + WalletProvider + Clone, DstProvider: Sola
             .allowance(source_provider.default_signer_address(), token_messenger)
             .call()
             .await?;
-        if current_allowance < U256::from(10) {
+        if current_allowance < 10 {
             debug!("Approving allowance");
             let approve_hash = erc20
                 .approve(token_messenger, U256::from(10))

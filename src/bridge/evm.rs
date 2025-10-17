@@ -1,19 +1,18 @@
 use {
     super::Cctp,
     crate::{
+        Attestation,
         CctpChain,
         ERC20,
-        EvmBridgeResult,
         MessageTransmitter,
         TokenMessengerContract,
         error::Result,
     },
     alloy_chains::NamedChain,
     alloy_network::Ethereum,
-    alloy_primitives::{Address as EvmAddress, TxHash, hex::encode, ruint::aliases::U256},
+    alloy_primitives::{Address as EvmAddress, TxHash, ruint::aliases::U256},
     alloy_provider::{Provider, WalletProvider},
     reqwest::Client,
-    std::time::Duration,
     tracing::{Level, debug, info, instrument},
 };
 // EVM to EVM bridging implementation
@@ -39,23 +38,22 @@ impl<
         }
     }
 
-    #[instrument(skip(self,max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
-    pub async fn bridge(
+    #[instrument(skip(max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
+    pub async fn burn(
         &self,
         amount: alloy_primitives::U256,
         destination_caller: Option<EvmAddress>,
         max_fee: Option<U256>,
         min_finality_threshold: Option<u32>,
-        //        attestation_poll_interval: Option<u64>,
-    ) -> Result<super::EvmBridgeResult> {
+    ) -> Result<(TxHash, Option<TxHash>)> {
         info!("burning {amount}");
         let source_provider = self.source_provider();
-        let destination_provider = self.destination_provider();
         let recipient: EvmAddress = self.recipient().try_into()?;
         let token_messenger: EvmAddress = self.token_messenger_contract()?.try_into()?;
-        let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let destination_domain = self.destination_domain_id()?;
         let usdc_address = self.source_chain().usdc_token_address()?.try_into()?;
+        let (confirmations, confirm_timeout) =
+            super::get_chain_confirmation_config(&self.source_chain);
         let erc20 = ERC20::new(usdc_address, source_provider);
 
         let usdc_balance = erc20
@@ -64,16 +62,21 @@ impl<
             .await?;
         debug!("balance {usdc_balance}");
 
+        if usdc_balance < amount {
+            return Err(crate::Error::InsufficientBalance(usdc_balance, amount));
+        }
         let current_allowance = erc20
             .allowance(source_provider.default_signer_address(), token_messenger)
             .call()
             .await?;
-        let approval_hash: Option<TxHash> = if current_allowance < U256::from(10) {
+        let approval_hash: Option<TxHash> = if current_allowance < amount {
             debug!("Approving allowance");
             let approve_hash = erc20
-                .approve(token_messenger, U256::from(10))
+                .approve(token_messenger, amount)
                 .send()
                 .await?
+                .with_required_confirmations(confirmations)
+                .with_timeout(Some(confirm_timeout))
                 .watch()
                 .await?;
             info!("Approved USDC spending: {}", approve_hash);
@@ -96,16 +99,19 @@ impl<
         let burn_hash = source_provider
             .send_transaction(burn_tx)
             .await?
-            .with_required_confirmations(2)
-            .with_timeout(Some(Duration::from_secs(
-                self.source_chain().confirmation_average_time_seconds()?,
-            )))
+            .with_required_confirmations(confirmations)
+            .with_timeout(Some(confirm_timeout))
             .watch()
             .await?;
-        let attestation = self
-            .get_attestation_with_retry(format!("0x{}", encode(burn_hash)), None, Some(10))
-            .await?;
 
+        Ok((burn_hash, approval_hash))
+    }
+
+    pub async fn recv_with_attestation(&self, attestation: &Attestation) -> Result<TxHash> {
+        let destination_provider = self.destination_provider();
+        let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
+        let (confirmations, confirm_timeout) =
+            super::get_chain_confirmation_config(self.destination_chain());
         let message_transmitter =
             MessageTransmitter::new(message_transmitter, destination_provider);
 
@@ -114,20 +120,28 @@ impl<
             attestation.attestation.clone().into(),
         );
 
-        info!("receiving {amount} on chain {}", self.destination_chain(),);
-        let recv_hash = recv_message_tx
+        info!("receiving on chain {}", self.destination_chain());
+        Ok(recv_message_tx
             .send()
             .await?
-            .with_required_confirmations(2)
-            .with_timeout(Some(Duration::from_secs(90)))
+            .with_required_confirmations(confirmations)
+            .with_timeout(Some(confirm_timeout))
             .watch()
+            .await?)
+    }
+
+    #[instrument(level = Level::INFO)]
+    pub async fn recv(
+        &self,
+        burn_hash: TxHash,
+        max_attempts: Option<u32>,
+        poll_interval: Option<u64>,
+    ) -> Result<(Attestation, TxHash)> {
+        let attestation = self
+            .get_attestation_evm(burn_hash, max_attempts, poll_interval)
             .await?;
 
-        Ok(EvmBridgeResult {
-            approval: approval_hash,
-            burn: burn_hash,
-            recv: recv_hash,
-            attestation,
-        })
+        let hash = self.recv_with_attestation(&attestation).await?;
+        Ok((attestation, hash))
     }
 }

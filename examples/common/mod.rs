@@ -10,7 +10,7 @@ use {
 };
 
 #[allow(dead_code)]
-pub fn evm_setup() -> anyhow::Result<impl WalletProvider + Provider + Clone> {
+pub fn evm_base_setup() -> anyhow::Result<impl WalletProvider + Provider + Clone> {
     let secret_key = env::var("EVM_SECRET_KEY").expect("EVM_SECRET_KEY not set");
     let wallet = PrivateKeySigner::from_str(&secret_key).expect("Invalid private key");
     let api_key = env::var("ALCHEMY_API_KEY").expect("ALCHEMY_API_KEY not set");

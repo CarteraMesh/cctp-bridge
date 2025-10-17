@@ -44,11 +44,13 @@ pub fn evm_setup(base_sepolia: bool) -> anyhow::Result<impl WalletProvider + Pro
     } else {
         "https://eth-sepolia.g.alchemy.com/v2"
     };
-    let base_provider = ProviderBuilder::new()
+    let provider = ProviderBuilder::new()
         .wallet(wallet)
         .connect_http(format!("{url}/{api_key}").parse()?);
-    Ok(base_provider)
+    info!("evm address {}", provider.default_signer_address());
+    Ok(provider)
 }
+
 pub fn solana_setup() -> anyhow::Result<(Keypair, RpcClient)> {
     let kp_file = env::var("KEYPAIR_FILE").ok();
     let owner = if let Some(kp) = kp_file {
@@ -66,6 +68,9 @@ pub fn solana_setup() -> anyhow::Result<(Keypair, RpcClient)> {
     Ok((owner, rpc))
 }
 
+const fn usdc_amount(dollars: u64) -> u64 {
+    dollars * 1_000_000 // USDC has 6 decimals
+}
 #[tokio::test]
 async fn test_reclaim() -> Result<()> {
     setup();
@@ -82,12 +87,11 @@ async fn test_reclaim() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_evm() -> Result<()> {
+async fn test_burn_too_much() -> Result<()> {
     setup();
     let sepolia_provider = evm_setup(false)?;
     let base_provider = evm_setup(true)?;
     let recipient = base_provider.default_signer_address();
-    info!("evm address {recipient}");
 
     let bridge = Cctp::new(
         sepolia_provider,
@@ -96,8 +100,46 @@ async fn test_evm() -> Result<()> {
         NamedChain::BaseSepolia,
         recipient,
     );
-    let result = bridge.bridge(U256::from(10), None, None, None).await?;
-    info!("bridge result {}", result);
+    let too_much: u64 = usdc_amount(10_000_000_000);
+    let result = bridge.burn(U256::from(too_much), None, None, None).await;
+    assert!(result.is_err(), "Should fail with insufficient balance");
+
+    let e = result.unwrap_err();
+    assert!(matches!(e, cctp_bridge::Error::InsufficientBalance(_, _)));
+    println!("error {e}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_evm_burn_recv_split() -> Result<()> {
+    setup();
+    let sepolia_provider = evm_setup(false)?;
+    let base_provider = evm_setup(true)?;
+    let recipient = base_provider.default_signer_address();
+
+    let bridge = Cctp::new(
+        sepolia_provider,
+        base_provider,
+        NamedChain::Sepolia,
+        NamedChain::BaseSepolia,
+        recipient,
+    );
+    let (burn_hash, approval_hash) = bridge.burn(U256::from(15), None, None, None).await?;
+    assert!(!burn_hash.is_zero(), "Burn hash should not be zero");
+    info!(
+        "burn {burn_hash} approval {}",
+        approval_hash.unwrap_or_default()
+    );
+    let attest = bridge.get_attestation_evm(burn_hash, None, None).await?;
+    let (recv_attest, recv_hash) = bridge.recv(burn_hash, None, None).await?;
+    assert!(!recv_hash.is_zero(), "Receive hash should not be zero");
+    assert!(
+        !attest.attestation.is_empty(),
+        "Attestation should not be empty"
+    );
+    assert!(!attest.message.is_empty(), "Message should not be empty");
+    assert_eq!(recv_attest, attest);
+    info!("attest {attest} recv {recv_hash}");
     Ok(())
 }
 

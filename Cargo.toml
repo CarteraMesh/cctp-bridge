@@ -28,7 +28,6 @@ alloy-provider = { version = "1", default-features = false, features = [
 alloy-rpc-types = "1"
 alloy-sol-types = { version = "1", features = ["json"] }
 alloy-transport = { version = "1", default-features = false }
-bincode = "1"
 nitrogen-circle-message-transmitter-v2-encoder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
 nitrogen-circle-token-messenger-minter-v2-encoder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
 nitrogen-instruction-builder = { git = "https://github.com/CarteraMesh/nitrogen.git", branch = "main" }
@@ -42,6 +41,7 @@ solana-signature = "2"
 solana-signer = "2"
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["time"] }
 tracing = "0.1"
 
 [dev-dependencies]

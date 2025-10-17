@@ -5,14 +5,62 @@
 [![CI](https://github.com/CarteraMesh/cctp-bridge/workflows/test/badge.svg)](https://github.com/CarteraMesh/cctp-bridge/actions)
 [![Cov](https://codecov.io/github/CarteraMesh/cctp-bridge/graph/badge.svg?token=dILa1k9tlW)](https://codecov.io/github/CarteraMesh/cctp-bridge)
 
-## Installation
+## About
 
-### Cargo
+cctp-bridge is a Rust-based helper library for the Cross-Chain Token Protocol [CCTP](https://developers.circle.com/cctp). It facilitates the transfer of USDC between different blockchain networks.
+This crates provides flexible control over the transfer process, allowing users to customize various aspects of the transfer.
 
-* Install the rust toolchain in order to have cargo installed by following
-  [this](https://www.rust-lang.org/tools/install) guide.
-* run `cargo install cctp-bridge`
+This project is a fork of the [cctp-rs](https://github.com/semiotic-ai/cctp-rs) [crate](https://crates.io/crates/cctp-rs)
 
+## Example
+
+```rust
+
+mod common;
+
+use {
+    alloy_chains::NamedChain,
+    alloy_provider::WalletProvider,
+    cctp_bridge::{Cctp, SolanSigners},
+    common::*,
+    solana_signer::Signer,
+    tracing::info,
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
+    tracing_subscriber::fmt::init();
+    // Setup wallets
+    let base_sepolia_wallet_provider = evm_base_setup()?;
+    let (solana_keypair, rpc) = solana_setup()?;
+    info!(
+        "solana address {} sends to base address {}",
+        solana_keypair.pubkey(),
+        base_sepolia_wallet_provider.default_signer_address()
+    );
+
+    // Convenience wrapper for cctp_bridge::SolanaProvider trait
+    let rpc_wrapper: cctp_bridge::SolanaWrapper = rpc.into();
+    // Convenience wrapper for solana_signer::Signer for use of CCTP operations
+    let signers = SolanSigners::new(solana_keypair);
+
+    let bridge = Cctp::new_solana_evm(
+        rpc_wrapper,
+        base_sepolia_wallet_provider,
+        cctp_bridge::SOLANA_DEVNET, // source chain
+        NamedChain::BaseSepolia, // destination chain
+    );
+    // 0.000010 USDC to base sepolia
+    let result = bridge.bridge_sol_evm(10, signers, None, None, None).await?;
+    println!("Solana burn txHash {}", result.burn);
+    println!(
+        "Base Receive txHash {}",
+        alloy_primitives::hex::encode(result.recv)
+    );
+    Ok(())
+}
+```
 
 ## Development
 
