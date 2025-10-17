@@ -1,7 +1,7 @@
 mod common;
 
 use {
-    cctp_bridge::{Cctp, SolanaWrapper},
+    cctp_client::{Cctp, SolanaWrapper},
     solana_signer::Signer,
     tracing::info,
 };
@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     info!("solana address {}", owner.pubkey(),);
     let rpc: SolanaWrapper = rpc.into();
 
-    let bridge = Cctp::new_reclaim(rpc.clone(), rpc, cctp_bridge::SOLANA_DEVNET);
+    let bridge = Cctp::new_reclaim(rpc.clone(), rpc, cctp_client::SOLANA_DEVNET);
     let result = bridge.reclaim(&owner).await?;
     println!("reclaimed {} accounts", result.len());
     for (sig, addr) in result {

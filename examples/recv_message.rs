@@ -2,7 +2,7 @@ mod common;
 
 use {
     alloy_chains::NamedChain,
-    cctp_bridge::{Cctp, SolanaWrapper},
+    cctp_client::{Cctp, SolanaWrapper},
 };
 
 #[tokio::main]
@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
         rpc.clone(),
         rpc,
         NamedChain::BaseSepolia,
-        cctp_bridge::SOLANA_DEVNET,
+        cctp_client::SOLANA_DEVNET,
     );
     let result = bridge
         .recv_message_sol(

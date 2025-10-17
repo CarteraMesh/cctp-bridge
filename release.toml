@@ -2,7 +2,7 @@
 enable-all-features = false
 
 # Pre-release checks
-pre-release-commit-message = "chore: release cctp_bridge v"
+pre-release-commit-message = "chore: release cctp_client v"
 
 # Tag settings
 tag-message = "chore: release v"
