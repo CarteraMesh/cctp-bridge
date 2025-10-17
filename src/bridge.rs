@@ -8,7 +8,7 @@ use {
         CctpChain,
         error::{Error, Result},
     },
-    alloy_chains::{Chain, NamedChain},
+    alloy_chains::{Chain, ChainKind, NamedChain},
     alloy_network::Ethereum,
     alloy_primitives::{
         FixedBytes,
@@ -21,9 +21,9 @@ use {
     solana_signature::Signature as SolanaSignature,
     std::{
         fmt::{Debug, Display},
-        thread::sleep,
         time::Duration,
     },
+    tokio::time::sleep,
     tracing::{Level, debug, error, info, instrument, trace},
 };
 
@@ -55,12 +55,15 @@ pub const CHAIN_CONFIRMATION_CONFIG: &[(NamedChain, u64, Duration)] = &[
 ];
 
 /// Gets the chain-specific confirmation configuration
-pub fn get_chain_confirmation_config(chain: &NamedChain) -> (u64, Duration) {
-    CHAIN_CONFIRMATION_CONFIG
-        .iter()
-        .find(|(ch, _, _)| ch == chain)
-        .map(|(_, confirmations, timeout)| (*confirmations, *timeout))
-        .unwrap_or((1, DEFAULT_CONFIRMATION_TIMEOUT))
+pub fn get_chain_confirmation_config(chain: &Chain) -> (u64, Duration) {
+    match chain.kind() {
+        ChainKind::Named(n) => CHAIN_CONFIRMATION_CONFIG
+            .iter()
+            .find(|(ch, _, _)| ch == n)
+            .map(|(_, confirmations, timeout)| (*confirmations, *timeout))
+            .unwrap_or((1, DEFAULT_CONFIRMATION_TIMEOUT)),
+        ChainKind::Id(_) => (2, Duration::from_secs(4)), // TODO add specific timeout for id chain
+    }
 }
 
 /// For solana reclaim accounts
@@ -269,7 +272,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
             if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 let secs = 5 * 60;
                 debug!(sleep_secs = ?secs, "Rate limit exceeded, waiting before retrying");
-                sleep(Duration::from_secs(secs));
+                sleep(Duration::from_secs(secs)).await;
                 continue;
             }
 
@@ -282,7 +285,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
                     poll_interval = ?poll_interval,
                     "Attestation not found (404), waiting before retrying"
                 );
-                sleep(Duration::from_secs(poll_interval));
+                sleep(Duration::from_secs(poll_interval)).await;
                 continue;
             }
 
@@ -353,7 +356,7 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
                         poll_interval = ?poll_interval,
                         "Attestation pending, waiting before retrying"
                     );
-                    sleep(Duration::from_secs(poll_interval));
+                    sleep(Duration::from_secs(poll_interval)).await;
                 }
             }
         }

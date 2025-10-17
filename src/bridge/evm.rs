@@ -13,7 +13,6 @@ use {
     alloy_primitives::{Address as EvmAddress, TxHash, ruint::aliases::U256},
     alloy_provider::{Provider, WalletProvider},
     reqwest::Client,
-    std::time::Duration,
     tracing::{Level, debug, info, instrument},
 };
 // EVM to EVM bridging implementation
@@ -53,11 +52,8 @@ impl<
         let token_messenger: EvmAddress = self.token_messenger_contract()?.try_into()?;
         let destination_domain = self.destination_domain_id()?;
         let usdc_address = self.source_chain().usdc_token_address()?.try_into()?;
-        // TODO make configurable or add to chain a helper method
-        let confirmations = 2;
-        let confirm_timeout = Some(Duration::from_secs(
-            self.source_chain().confirmation_average_time_seconds()? * confirmations,
-        ));
+        let (confirmations, confirm_timeout) =
+            super::get_chain_confirmation_config(&self.source_chain);
         let erc20 = ERC20::new(usdc_address, source_provider);
 
         let usdc_balance = erc20
@@ -76,11 +72,11 @@ impl<
         let approval_hash: Option<TxHash> = if current_allowance < amount {
             debug!("Approving allowance");
             let approve_hash = erc20
-                .approve(token_messenger, U256::from(amount))
+                .approve(token_messenger, amount)
                 .send()
                 .await?
                 .with_required_confirmations(confirmations)
-                .with_timeout(confirm_timeout)
+                .with_timeout(Some(confirm_timeout))
                 .watch()
                 .await?;
             info!("Approved USDC spending: {}", approve_hash);
@@ -104,7 +100,7 @@ impl<
             .send_transaction(burn_tx)
             .await?
             .with_required_confirmations(confirmations)
-            .with_timeout(confirm_timeout)
+            .with_timeout(Some(confirm_timeout))
             .watch()
             .await?;
 
@@ -114,13 +110,8 @@ impl<
     pub async fn recv_with_attestation(&self, attestation: &Attestation) -> Result<TxHash> {
         let destination_provider = self.destination_provider();
         let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
-        // TODO make configurable or add to chain a helper method
-        let confirmations = 2;
-        let confirm_timeout = Some(Duration::from_secs(
-            self.destination_chain()
-                .confirmation_average_time_seconds()?
-                * confirmations,
-        ));
+        let (confirmations, confirm_timeout) =
+            super::get_chain_confirmation_config(self.destination_chain());
         let message_transmitter =
             MessageTransmitter::new(message_transmitter, destination_provider);
 
@@ -134,7 +125,7 @@ impl<
             .send()
             .await?
             .with_required_confirmations(confirmations)
-            .with_timeout(confirm_timeout)
+            .with_timeout(Some(confirm_timeout))
             .watch()
             .await?)
     }

@@ -7,7 +7,7 @@
 
 ## About
 
-cctp-bridge is a Rust-based helper library for the Cross-Chain Token Protocol [CTCP](https://developers.circle.com/cctp). It facilitates the transfer of USDC between different blockchain networks.
+cctp-bridge is a Rust-based helper library for the Cross-Chain Token Protocol [CCTP](https://developers.circle.com/cctp). It facilitates the transfer of USDC between different blockchain networks.
 This crates provides flexible control over the transfer process, allowing users to customize various aspects of the transfer.
 
 This project is a fork of the [cctp-rs](https://github.com/semiotic-ai/cctp-rs) [crate](https://crates.io/crates/cctp-rs)

@@ -68,6 +68,9 @@ pub fn solana_setup() -> anyhow::Result<(Keypair, RpcClient)> {
     Ok((owner, rpc))
 }
 
+const fn usdc_amount(dollars: u64) -> u64 {
+    dollars * 1_000_000 // USDC has 6 decimals
+}
 #[tokio::test]
 async fn test_reclaim() -> Result<()> {
     setup();
@@ -97,7 +100,7 @@ async fn test_burn_too_much() -> Result<()> {
         NamedChain::BaseSepolia,
         recipient,
     );
-    let too_much: u64 = 10_000_000_000 * 1_000_000; // 10 billion USDC with 6 decimals, if I had this, I wouldn't be doing this test
+    let too_much: u64 = usdc_amount(10_000_000_000);
     let result = bridge.burn(U256::from(too_much), None, None, None).await;
     assert!(result.is_err(), "Should fail with insufficient balance");
 
