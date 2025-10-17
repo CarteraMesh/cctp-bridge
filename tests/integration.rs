@@ -84,26 +84,6 @@ async fn test_reclaim() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_evm_bridge() -> Result<()> {
-    setup();
-    let sepolia_provider = evm_setup(false)?;
-    let base_provider = evm_setup(true)?;
-    let recipient = base_provider.default_signer_address();
-    let bridge = Cctp::new(
-        sepolia_provider,
-        base_provider,
-        NamedChain::Sepolia,
-        NamedChain::BaseSepolia,
-        recipient,
-    );
-    let result = bridge
-        .bridge(U256::from(10), None, None, None, None, None)
-        .await?;
-    info!("bridge result {}", result);
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_evm_burn_recv_split() -> Result<()> {
     setup();
     let sepolia_provider = evm_setup(false)?;
@@ -117,19 +97,21 @@ async fn test_evm_burn_recv_split() -> Result<()> {
         NamedChain::BaseSepolia,
         recipient,
     );
-    let (burn_hash, approval_hash) = bridge.burn(U256::from(10), None, None, None).await?;
+    let (burn_hash, approval_hash) = bridge.burn(U256::from(15), None, None, None).await?;
     assert!(!burn_hash.is_zero(), "Burn hash should not be zero");
     info!(
         "burn {burn_hash} approval {}",
         approval_hash.unwrap_or_default()
     );
-
-    let (attest, recv_hash) = bridge.recv(burn_hash, None, None).await?;
+    let attest = bridge.get_attestation_evm(burn_hash, None, None).await?;
+    let (recv_attest, recv_hash) = bridge.recv(burn_hash, None, None).await?;
     assert!(!recv_hash.is_zero(), "Receive hash should not be zero");
     assert!(
         !attest.attestation.is_empty(),
         "Attestation should not be empty"
     );
+    assert!(!attest.message.is_empty(), "Message should not be empty");
+    assert_eq!(recv_attest, attest);
     info!("attest {attest} recv {recv_hash}");
     Ok(())
 }

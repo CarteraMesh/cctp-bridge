@@ -10,7 +10,11 @@ use {
     },
     alloy_chains::{Chain, NamedChain},
     alloy_network::Ethereum,
-    alloy_primitives::{FixedBytes, TxHash, hex},
+    alloy_primitives::{
+        FixedBytes,
+        TxHash,
+        hex::{self, encode},
+    },
     alloy_provider::Provider,
     alloy_sol_types::SolEvent,
     reqwest::{Client, Response},
@@ -114,7 +118,7 @@ impl Display for EvmBridgeResult {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Cctp<SrcProvider, DstProvider> {
     source_provider: SrcProvider,
     destination_provider: DstProvider,
@@ -122,6 +126,18 @@ pub struct Cctp<SrcProvider, DstProvider> {
     destination_chain: Chain,
     recipient: Address,
     client: Client,
+}
+
+impl<SrcProvider, DstProvider> Debug for Cctp<SrcProvider, DstProvider> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let src_domain = self.source_chain.cctp_domain_id().unwrap_or(u32::MAX);
+        let dst_domain = self.destination_chain.cctp_domain_id().unwrap_or(u32::MAX);
+        write!(
+            f,
+            "CCTP[{}({})->{}({})]",
+            self.source_chain, src_domain, self.destination_chain, dst_domain
+        )
+    }
 }
 
 impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
@@ -194,6 +210,21 @@ impl<SrcProvider, DstProvider> Cctp<SrcProvider, DstProvider> {
                 .expect("Chain is not supported"),
             message_hash.as_ref()
         )
+    }
+
+    /// Wrapper call to [`get_attestation_with_retry`] for evm [`TxHash`]
+    pub async fn get_attestation_evm(
+        &self,
+        message_hash: TxHash,
+        max_attempts: Option<u32>,
+        poll_interval: Option<u64>,
+    ) -> Result<Attestation> {
+        self.get_attestation_with_retry(
+            format!("0x{}", encode(message_hash)),
+            max_attempts,
+            poll_interval,
+        )
+        .await
     }
 
     /// Gets the attestation for a message hash from the CCTP API

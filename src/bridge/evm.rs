@@ -4,14 +4,13 @@ use {
         Attestation,
         CctpChain,
         ERC20,
-        EvmBridgeResult,
         MessageTransmitter,
         TokenMessengerContract,
         error::Result,
     },
     alloy_chains::NamedChain,
     alloy_network::Ethereum,
-    alloy_primitives::{Address as EvmAddress, TxHash, hex::encode, ruint::aliases::U256},
+    alloy_primitives::{Address as EvmAddress, TxHash, ruint::aliases::U256},
     alloy_provider::{Provider, WalletProvider},
     reqwest::Client,
     std::time::Duration,
@@ -40,7 +39,7 @@ impl<
         }
     }
 
-    #[instrument(skip(self,max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
+    #[instrument(skip(max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
     pub async fn burn(
         &self,
         amount: alloy_primitives::U256,
@@ -69,7 +68,7 @@ impl<
         let approval_hash: Option<TxHash> = if current_allowance < amount {
             debug!("Approving allowance");
             let approve_hash = erc20
-                .approve(token_messenger, U256::from(10))
+                .approve(token_messenger, U256::from(amount))
                 .send()
                 .await?
                 .watch()
@@ -104,7 +103,7 @@ impl<
         Ok((burn_hash, approval_hash))
     }
 
-    #[instrument(skip(self), level = Level::INFO)]
+    #[instrument(level = Level::INFO)]
     pub async fn recv(
         &self,
         burn_hash: TxHash,
@@ -114,11 +113,7 @@ impl<
         let destination_provider = self.destination_provider();
         let message_transmitter: EvmAddress = self.message_transmitter_contract()?.try_into()?;
         let attestation = self
-            .get_attestation_with_retry(
-                format!("0x{}", encode(burn_hash)),
-                max_attempts,
-                poll_interval,
-            )
+            .get_attestation_evm(burn_hash, max_attempts, poll_interval)
             .await?;
 
         let message_transmitter =
@@ -142,39 +137,5 @@ impl<
                 .watch()
                 .await?,
         ))
-    }
-
-    #[instrument(skip(self,max_fee,destination_caller,min_finality_threshold), level = Level::INFO)]
-    pub async fn bridge(
-        &self,
-        amount: alloy_primitives::U256,
-        destination_caller: Option<EvmAddress>,
-        max_fee: Option<U256>,
-        min_finality_threshold: Option<u32>,
-        max_attempts: Option<u32>,
-        attestation_poll_interval: Option<u64>,
-    ) -> Result<super::EvmBridgeResult> {
-        // verify addresses resolve to real evm before burning. See recv method for more
-        // details.
-        let _: EvmAddress = self.message_transmitter_contract()?.try_into()?;
-        let (burn_hash, approval_hash) = self
-            .burn(amount, destination_caller, max_fee, min_finality_threshold)
-            .await?;
-
-        match self
-            .recv(burn_hash, max_attempts, attestation_poll_interval)
-            .await
-        {
-            Ok((attestation, recv_hash)) => Ok(EvmBridgeResult {
-                approval: approval_hash,
-                burn: burn_hash,
-                recv: recv_hash,
-                attestation,
-            }),
-            Err(e) => Err(crate::Error::ReceiveFailedAfterBurn {
-                burn_hash: format!("{}", burn_hash),
-                reason: e.to_string(),
-            }),
-        }
     }
 }
