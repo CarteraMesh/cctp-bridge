@@ -84,6 +84,30 @@ async fn test_reclaim() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_burn_too_much() -> Result<()> {
+    setup();
+    let sepolia_provider = evm_setup(false)?;
+    let base_provider = evm_setup(true)?;
+    let recipient = base_provider.default_signer_address();
+
+    let bridge = Cctp::new(
+        sepolia_provider,
+        base_provider,
+        NamedChain::Sepolia,
+        NamedChain::BaseSepolia,
+        recipient,
+    );
+    let too_much: u64 = 10_000_000_000 * 1_000_000; // 10 billion USDC with 6 decimals, if I had this, I wouldn't be doing this test
+    let result = bridge.burn(U256::from(too_much), None, None, None).await;
+    assert!(result.is_err(), "Should fail with insufficient balance");
+
+    let e = result.unwrap_err();
+    assert!(matches!(e, cctp_bridge::Error::InsufficientBalance(_, _)));
+    println!("error {e}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_evm_burn_recv_split() -> Result<()> {
     setup();
     let sepolia_provider = evm_setup(false)?;

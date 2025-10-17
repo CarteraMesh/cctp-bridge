@@ -330,6 +330,16 @@ mod tests {
         assert_eq!(chain.confirmation_average_time_seconds().unwrap(), expected);
     }
 
+    #[rstest]
+    #[case(SOLANA_DEVNET, 4)]
+    #[case(SOLANA_MAINNET, 4)]
+    fn test_sol_confirmation_average_time_seconds_supported_chains(
+        #[case] chain: Chain,
+        #[case] expected: u64,
+    ) {
+        assert_eq!(chain.confirmation_average_time_seconds().unwrap(), expected);
+    }
+
     #[test]
     fn test_confirmation_average_time_seconds_unsupported_chain() {
         let result = NamedChain::BinanceSmartChain.confirmation_average_time_seconds();
@@ -381,6 +391,27 @@ mod tests {
         #[case] expected_addr: alloy_primitives::Address,
     ) -> anyhow::Result<()> {
         let result: alloy_primitives::Address = chain.token_messenger_address()?.try_into()?;
+        assert_eq!(result, expected_addr);
+        Ok(())
+    }
+
+    #[rstest]
+    #[case(NamedChain::Mainnet, ETHEREUM_USDC_CONTRACT)]
+    #[case(NamedChain::Arbitrum, ARBITRUM_USDC_CONTRACT)]
+    #[case(NamedChain::Avalanche, AVALANCHE_USDC_CONTRACT)]
+    #[case(NamedChain::Base, BASE_USDC_CONTRACT)]
+    #[case(NamedChain::Optimism, OPTIMISM_USDC_CONTRACT)]
+    #[case(NamedChain::Polygon, POLYGON_USDC_CONTRACT)]
+    #[case(NamedChain::ArbitrumSepolia, ARBITRUM_SEPOLIA_USDC_CONTRACT)]
+    #[case(NamedChain::Sepolia, ETHEREUM_SEPOLIA_USDC_CONTRACT)]
+    #[case(NamedChain::BaseSepolia, BASE_SEPOLIA_USDC_CONTRACT)]
+    #[case(NamedChain::OptimismSepolia, OPTIMISM_SEPOLIA_USDC_CONTRACT)]
+    #[case(NamedChain::Unichain, UNICHAIN_USDC_CONTRACT)]
+    fn test_evm_usdc_address(
+        #[case] chain: NamedChain,
+        #[case] expected_addr: alloy_primitives::Address,
+    ) -> anyhow::Result<()> {
+        let result: alloy_primitives::Address = chain.usdc_token_address()?.try_into()?;
         assert_eq!(result, expected_addr);
         Ok(())
     }

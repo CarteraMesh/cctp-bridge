@@ -1,4 +1,7 @@
-use {alloy_primitives::hex::FromHexError, thiserror::Error};
+use {
+    alloy_primitives::{hex::FromHexError, ruint::aliases::U256},
+    thiserror::Error,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -70,6 +73,9 @@ pub enum Error {
 
     #[error("failed to get solana fee recipient account: {0}")]
     SolanaFeeRecipientError(String),
+
+    #[error("Insufficient balance balance={0} amount={1}")]
+    InsufficientBalance(U256, U256),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
