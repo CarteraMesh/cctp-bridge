@@ -3,7 +3,7 @@ mod common;
 use {
     alloy_chains::NamedChain,
     alloy_provider::WalletProvider,
-    cctp_bridge::{Cctp, SolanSigners},
+    cctp_client::{Cctp, SolanSigners},
     common::*,
     solana_signer::Signer,
     tracing::info,
@@ -22,15 +22,15 @@ async fn main() -> anyhow::Result<()> {
         base_sepolia_wallet_provider.default_signer_address()
     );
 
-    // Convenience wrapper for cctp_bridge::SolanaProvider trait
-    let rpc_wrapper: cctp_bridge::SolanaWrapper = rpc.into();
+    // Convenience wrapper for cctp_client::SolanaProvider trait
+    let rpc_wrapper: cctp_client::SolanaWrapper = rpc.into();
     // Convenience wrapper for solana_signer::Signer for use of CCTP operations
     let signers = SolanSigners::new(solana_keypair);
 
     let bridge = Cctp::new_solana_evm(
         rpc_wrapper,
         base_sepolia_wallet_provider,
-        cctp_bridge::SOLANA_DEVNET,
+        cctp_client::SOLANA_DEVNET,
         NamedChain::BaseSepolia,
     );
     // 0.000010 USDC to base sepolia

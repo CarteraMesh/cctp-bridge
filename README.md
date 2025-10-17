@@ -1,13 +1,13 @@
-# cctp-bridge
+# cctp-client
 
-[![Crates.io](https://img.shields.io/crates/v/cctp-bridge.svg)](https://crates.io/crates/cctp-bridge)
-[![Docs.rs](https://docs.rs/cctp-bridge/badge.svg)](https://docs.rs/cctp-bridge)
-[![CI](https://github.com/CarteraMesh/cctp-bridge/workflows/test/badge.svg)](https://github.com/CarteraMesh/cctp-bridge/actions)
-[![Cov](https://codecov.io/github/CarteraMesh/cctp-bridge/graph/badge.svg?token=dILa1k9tlW)](https://codecov.io/github/CarteraMesh/cctp-bridge)
+[![Crates.io](https://img.shields.io/crates/v/cctp-client.svg)](https://crates.io/crates/cctp-client)
+[![Docs.rs](https://docs.rs/cctp-client/badge.svg)](https://docs.rs/cctp-client)
+[![CI](https://github.com/CarteraMesh/cctp-client/workflows/test/badge.svg)](https://github.com/CarteraMesh/cctp-client/actions)
+[![Cov](https://codecov.io/github/CarteraMesh/cctp-client/graph/badge.svg?token=dILa1k9tlW)](https://codecov.io/github/CarteraMesh/cctp-client)
 
 ## About
 
-cctp-bridge is a Rust-based helper library for the Cross-Chain Token Protocol [CCTP](https://developers.circle.com/cctp). It facilitates the transfer of USDC between different blockchain networks.
+cctp-client is a Rust-based helper library for the Cross-Chain Token Protocol [CCTP](https://developers.circle.com/cctp). It facilitates the transfer of USDC between different blockchain networks.
 This crates provides flexible control over the transfer process, allowing users to customize various aspects of the transfer.
 
 This project is a fork of the [cctp-rs](https://github.com/semiotic-ai/cctp-rs) [crate](https://crates.io/crates/cctp-rs)
@@ -21,7 +21,7 @@ mod common;
 use {
     alloy_chains::NamedChain,
     alloy_provider::WalletProvider,
-    cctp_bridge::{Cctp, SolanSigners},
+    cctp_client::{Cctp, SolanSigners},
     common::*,
     solana_signer::Signer,
     tracing::info,
@@ -40,15 +40,15 @@ async fn main() -> anyhow::Result<()> {
         base_sepolia_wallet_provider.default_signer_address()
     );
 
-    // Convenience wrapper for cctp_bridge::SolanaProvider trait
-    let rpc_wrapper: cctp_bridge::SolanaWrapper = rpc.into();
+    // Convenience wrapper for cctp_client::SolanaProvider trait
+    let rpc_wrapper: cctp_client::SolanaWrapper = rpc.into();
     // Convenience wrapper for solana_signer::Signer for use of CCTP operations
     let signers = SolanSigners::new(solana_keypair);
 
     let bridge = Cctp::new_solana_evm(
         rpc_wrapper,
         base_sepolia_wallet_provider,
-        cctp_bridge::SOLANA_DEVNET, // source chain
+        cctp_client::SOLANA_DEVNET, // source chain
         NamedChain::BaseSepolia, // destination chain
     );
     // 0.000010 USDC to base sepolia
@@ -75,8 +75,8 @@ async fn main() -> anyhow::Result<()> {
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/CarteraMesh/cctp-bridge.git
-   cd cctp-bridge
+   git clone https://github.com/CarteraMesh/cctp-client.git
+   cd cctp-client
    ```
 
 2. **Build and test**

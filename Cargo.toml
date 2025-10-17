@@ -1,12 +1,12 @@
 [package]
-name = "cctp-bridge"
+name = "cctp-client"
 version = "0.1.0"
 edition = "2024"
 description = "Multi chain bridge for USDC"
-repository = "https://github.com/CarteraMesh/cctp-bridge"
+repository = "https://github.com/CarteraMesh/cctp-client"
 authors = ["gh@cartera-mesh.com"]
-documentation = "https://docs.rs/cctp-bridge"
-homepage = "https://github.com/CarteraMesh/cctp-bridge"
+documentation = "https://docs.rs/cctp-client"
+homepage = "https://github.com/CarteraMesh/cctp-client"
 categories = ["finance", "api-bindings"]
 keywords = ["defi", "solana", "ethereum", "web3", "blockchain", "sdk"]
 license = "Apache-2.0"

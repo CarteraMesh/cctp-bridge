@@ -47,7 +47,7 @@ jobs:
     name: ubuntu / stable / coverage / ${{ matrix.features }}
     env:
       RUST_BACKTRACE: 1
-      RUST_LOG: info,cctp_bridge=debug
+      RUST_LOG: info,cctp_client=debug
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
       EVM_SECRET_KEY: ${{ secrets.EVM_SECRET_KEY }}
       TEST_PRIVATE_KEY: ${{ secrets.TEST_PRIVATE_KEY }}

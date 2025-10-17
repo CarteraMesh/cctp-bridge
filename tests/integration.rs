@@ -4,7 +4,7 @@ use {
     alloy_provider::{Provider, ProviderBuilder, WalletProvider},
     alloy_signer_local::PrivateKeySigner,
     anyhow::Result,
-    cctp_bridge::{Cctp, SolanSigners, SolanaWrapper},
+    cctp_client::{Cctp, SolanSigners, SolanaWrapper},
     solana_commitment_config::CommitmentConfig,
     solana_keypair::Keypair,
     solana_rpc_client::nonblocking::rpc_client::RpcClient,
@@ -77,7 +77,7 @@ async fn test_reclaim() -> Result<()> {
     let (owner, rpc) = solana_setup()?;
     let rpc: SolanaWrapper = rpc.into();
 
-    let bridge = Cctp::new_reclaim(rpc.clone(), rpc, cctp_bridge::SOLANA_DEVNET);
+    let bridge = Cctp::new_reclaim(rpc.clone(), rpc, cctp_client::SOLANA_DEVNET);
     let result = bridge.reclaim(&owner).await?;
     info!("reclaimed {} accounts", result.len());
     for (sig, addr) in result {
@@ -105,7 +105,7 @@ async fn test_burn_too_much() -> Result<()> {
     assert!(result.is_err(), "Should fail with insufficient balance");
 
     let e = result.unwrap_err();
-    assert!(matches!(e, cctp_bridge::Error::InsufficientBalance(_, _)));
+    assert!(matches!(e, cctp_client::Error::InsufficientBalance(_, _)));
     println!("error {e}");
     Ok(())
 }
@@ -155,7 +155,7 @@ async fn test_evm_sol() -> Result<()> {
         rpc,
         NamedChain::Sepolia,
         owner.pubkey(),
-        cctp_bridge::SOLANA_DEVNET,
+        cctp_client::SOLANA_DEVNET,
     );
     let result = bridge
         .bridge_evm_sol(&owner, U256::from(10), None, None, None)
@@ -174,7 +174,7 @@ async fn test_sol_evm() -> Result<()> {
     let bridge = Cctp::new_solana_evm(
         rpc,
         base_provider,
-        cctp_bridge::SOLANA_DEVNET,
+        cctp_client::SOLANA_DEVNET,
         NamedChain::BaseSepolia,
     );
     let result = bridge

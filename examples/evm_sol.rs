@@ -4,7 +4,7 @@ use {
     alloy_chains::NamedChain,
     alloy_primitives::U256,
     alloy_provider::WalletProvider,
-    cctp_bridge::{Cctp, SolanaWrapper},
+    cctp_client::{Cctp, SolanaWrapper},
     solana_signer::Signer,
     tracing::info,
 };
@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
         rpc,
         NamedChain::BaseSepolia,
         owner.pubkey(),
-        cctp_bridge::SOLANA_DEVNET,
+        cctp_client::SOLANA_DEVNET,
     );
     let result = bridge
         .bridge_evm_sol(&owner, U256::from(10), None, None, None)
